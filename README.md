@@ -43,3 +43,23 @@ python python/app.py
 ```
 
 Use the **Render Animation Episode** workflow in GitHub Actions to produce the final MP4 artifact. The workflow installs Blender, FFmpeg, and eSpeak NG automatically. The current dialogue is a synthetic Arabic voice preview; final voice casting, expressive acting, phoneme-level lip-sync, and a composed soundtrack are future production upgrades.
+
+
+## الحلقة التاريخية الأولى: قطز
+
+أضيف مسار إنتاج مستقل للحلقة التاريخية «قطز: السلطان الذي أوقف زحف المغول»:
+
+- السيناريو: `episodes/episode_001_qutuz.md` (12 مشهداً × 15 ثانية).
+- مشاهد Blender ثلاثية الأبعاد الإجرائية: `blender/qutuz_episode.py`.
+- توليد الراوي العربي: `python/qutuz_audio.py` باستخدام eSpeak NG وFFmpeg.
+- سير الإنتاج: `.github/workflows/qutuz-episode.yml`.
+- الناتج النهائي المتوقع: `output/qutuz_episode_001.mp4`، بدقة 1280×720 و24 إطاراً/ثانية، مع ملف Artifact في GitHub Actions.
+
+### تشغيل إنتاج الحلقة
+
+1. افتح تبويب **Actions** في مستودع Mohak.
+2. اختر **Produce Qutuz Historical Episode**.
+3. اضغط **Run workflow** وانتظر اكتمال توليد الصوت والرندر والدمج.
+4. نزّل Artifact باسم `qutuz-historical-episode-001` بعد نجاح التشغيل.
+
+**ملاحظة إنتاجية:** مسار Blender الحالي يبني animatic ثلاثي الأبعاد إجرائياً بأشكال ومشاهد رمزية، وليس بعدُ فيلماً نهائياً بشخصيات ممثلين رقمية عالية التفاصيل أو تحريك وجوه/شفاه متقدم. أصوات الراوي في هذه المرحلة تخليقية عبر eSpeak NG. يجب مراجعة الفيديو الناتج والصوت والتوقيت بعد أول تشغيل قبل اعتماد الحلقة للنشر.
