@@ -27,7 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y curl xz-utils libxi6 libxrender1 libxfixes3 libxkbcommon0 libsm6 libgl1 libegl1 libegl-mesa0
+          sudo apt-get install -y curl xz-utils ffmpeg espeak-ng libxi6 libxrender1 libxfixes3 libxkbcommon0 libsm6 libgl1 libegl1 libegl-mesa0
           BLENDER_ARCHIVE="$RUNNER_TEMP/blender-4.5.16-linux-x64.tar.xz"
           BLENDER_DIR="$RUNNER_TEMP/blender"
           curl -fL --retry 3 --retry-delay 2 \
@@ -38,14 +38,26 @@ jobs:
           "$BLENDER_DIR/blender" --background --factory-startup --version
           echo "BLENDER_BIN=$BLENDER_DIR/blender" >> "$GITHUB_ENV"
 
-      - name: Render episode
+      - name: Generate Arabic dialogue and audio bed
+        run: python3 python/audio_production.py
+
+      - name: Render silent animation
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p output
           "$BLENDER_BIN" --background --factory-startup \
             -P blender/animation_project.py -- \
-            --output "output/${{ inputs.episode }}.mp4"
+            --output "output/${{ inputs.episode }}_silent.mp4"
+
+      - name: Mux audio into final MP4
+        shell: bash
+        run: |
+          set -euo pipefail
+          ffmpeg -y -i "output/${{ inputs.episode }}_silent.mp4" \
+            -i output/episode_001_audio.wav \
+            -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k \
+            -shortest "output/${{ inputs.episode }}.mp4"
           test -s "output/${{ inputs.episode }}.mp4"
           ls -lh output/
 
