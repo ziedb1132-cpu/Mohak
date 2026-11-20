@@ -51,18 +51,30 @@ def render():
     script = ROOT / "blender" / "animation_project.py"
     output_file = OUTPUT / f"{episode_id}.mp4"
     job_id = str(uuid.uuid4())[:8]
-    command = [blender, "-b", "-P", str(script), "--", "--output", str(output_file)]
+    silent_file = OUTPUT / f"{episode_id}_silent.mp4"
+    audio_script = ROOT / "python" / "audio_production.py"
+    audio_file = OUTPUT / "episode_001_audio.wav"
+    command = [blender, "-b", "-P", str(script), "--", "--output", str(silent_file)]
     try:
-        result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=1800)
-        status = "completed" if result.returncode == 0 and output_file.exists() else "failed"
+        audio_result = subprocess.run(["python", str(audio_script)], cwd=ROOT, capture_output=True, text=True, timeout=300)
+        if audio_result.returncode != 0:
+            raise RuntimeError("Audio generation failed: " + audio_result.stderr[-1500:])
+        render_result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=1800)
+        if render_result.returncode != 0:
+            raise RuntimeError("Blender render failed: " + render_result.stderr[-2500:])
+        mux_result = subprocess.run(["ffmpeg", "-y", "-i", str(silent_file), "-i", str(audio_file), "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", str(output_file)], cwd=ROOT, capture_output=True, text=True, timeout=300)
+        result = mux_result
+        status = "completed" if mux_result.returncode == 0 and output_file.exists() else "failed"
         JOBS[job_id] = {
             "id": job_id, "episode_id": episode_id, "status": status,
             "video_url": f"/videos/{output_file.name}" if status == "completed" else None,
-            "log": (result.stdout + "\n" + result.stderr)[-5000:],
+            "log": (audio_result.stdout + "\n" + render_result.stdout + "\n" + result.stderr)[-5000:],
         }
         return jsonify(JOBS[job_id]), (200 if status == "completed" else 500)
     except FileNotFoundError:
-        return jsonify({"error": "Blender executable not found. Install Blender or set BLENDER_BIN."}), 503
+        return jsonify({"error": "Required executable not found. Install Blender, ffmpeg and espeak-ng."}), 503
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 500
     except subprocess.TimeoutExpired:
         return jsonify({"error": "Render timed out"}), 504
 
