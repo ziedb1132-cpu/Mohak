@@ -7,7 +7,45 @@ permissions:
   contents: read
 
 jobs:
+  benchmark:
+    name: Benchmark 30 frames before full render
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install rendering dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y curl xz-utils libxi6 libxrender1 libxfixes3 libxkbcommon0 libsm6 libgl1 libegl1 libegl-mesa0
+      - name: Restore Blender archive cache
+        id: blender-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/blender-4.5.16-linux-x64.tar.xz
+          key: blender-4.5.16-linux-x64
+      - name: Download Blender archive when not cached
+        if: steps.blender-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fL --retry 3 --retry-delay 2 "https://download.blender.org/release/Blender4.5/blender-4.5.16-linux-x64.tar.xz" -o "$RUNNER_TEMP/blender-4.5.16-linux-x64.tar.xz"
+      - name: Install Blender 4.5.16
+        run: |
+          set -euo pipefail
+          DEST="$RUNNER_TEMP/blender"
+          mkdir -p "$DEST"
+          tar -xJf "$RUNNER_TEMP/blender-4.5.16-linux-x64.tar.xz" --strip-components=1 -C "$DEST"
+          "$DEST/blender" --background --factory-startup --version
+          echo "BLENDER_BIN=$DEST/blender" >> "$GITHUB_ENV"
+      - name: Render 30-frame benchmark from battle scene
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          "$BLENDER_BIN" --background --factory-startup -P blender/qutuz_episode.py -- --scene-index 10 --benchmark-frames 30 --resolution-scale 75 --eevee-samples 16 --output output/benchmark.mp4
+          test -s output/benchmark.mp4
+
   render-scenes:
+    needs: benchmark
     name: Render scene ${{ matrix.scene }}
     runs-on: ubuntu-22.04
     timeout-minutes: 330
@@ -24,21 +62,29 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y curl xz-utils ffmpeg libxi6 libxrender1 libxfixes3 libxkbcommon0 libsm6 libgl1 libegl1 libegl-mesa0
+      - name: Restore Blender archive cache
+        id: blender-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/blender-4.5.16-linux-x64.tar.xz
+          key: blender-4.5.16-linux-x64
+      - name: Download Blender archive when not cached
+        if: steps.blender-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fL --retry 3 --retry-delay 2 "https://download.blender.org/release/Blender4.5/blender-4.5.16-linux-x64.tar.xz" -o "$RUNNER_TEMP/blender-4.5.16-linux-x64.tar.xz"
       - name: Install Blender 4.5.16
         run: |
           set -euo pipefail
-          ARCHIVE="$RUNNER_TEMP/blender-4.5.16-linux-x64.tar.xz"
           DEST="$RUNNER_TEMP/blender"
-          curl -fL --retry 3 --retry-delay 2 "https://download.blender.org/release/Blender4.5/blender-4.5.16-linux-x64.tar.xz" -o "$ARCHIVE"
           mkdir -p "$DEST"
-          tar -xJf "$ARCHIVE" --strip-components=1 -C "$DEST"
+          tar -xJf "$RUNNER_TEMP/blender-4.5.16-linux-x64.tar.xz" --strip-components=1 -C "$DEST"
           "$DEST/blender" --background --factory-startup --version
           echo "BLENDER_BIN=$DEST/blender" >> "$GITHUB_ENV"
       - name: Render this 15-second scene (360 frames)
         run: |
           set -euo pipefail
           mkdir -p output
-          "$BLENDER_BIN" --background --factory-startup -P blender/qutuz_episode.py -- --scene-index "${{ matrix.scene }}" --output "output/scene_$(printf '%02d' "${{ matrix.scene }}").mp4"
+          "$BLENDER_BIN" --background --factory-startup -P blender/qutuz_episode.py -- --scene-index "${{ matrix.scene }}" --resolution-scale 75 --eevee-samples 16 --output "output/scene_$(printf '%02d' "${{ matrix.scene }}").mp4"
           test -s "output/scene_$(printf '%02d' "${{ matrix.scene }}").mp4"
       - name: Upload rendered scene
         uses: actions/upload-artifact@v4
@@ -75,7 +121,7 @@ jobs:
           for i in $(seq 1 12); do file="output/scenes/scene_$(printf '%02d' "$i").mp4"; test -s "$file" || { echo "Missing scene: $file"; exit 1; }; done
           : > output/concat.txt
           for i in $(seq 1 12); do printf "file 'scenes/scene_%02d.mp4'\n" "$i" >> output/concat.txt; done
-          ffmpeg -y -f concat -safe 0 -i output/concat.txt -an -r 24 -c:v libx264 -preset veryfast -crf 22 -pix_fmt yuv420p -movflags +faststart output/episode_001_silent.mp4
+          ffmpeg -y -f concat -safe 0 -i output/concat.txt -an -vf "scale=1280:720:flags=lanczos" -r 24 -c:v libx264 -preset veryfast -crf 22 -pix_fmt yuv420p -movflags +faststart output/episode_001_silent.mp4
           ffmpeg -y -i output/episode_001_silent.mp4 -i output/episode_001_audio.wav -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -t 180 -movflags +faststart output/qutuz_episode_001.mp4
           test -s output/qutuz_episode_001.mp4
           ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 output/qutuz_episode_001.mp4
