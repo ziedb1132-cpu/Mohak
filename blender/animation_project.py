@@ -42,6 +42,13 @@ def add_character(name, x, coat, skin, hair, scale=1.0):
     hair_obj.name = name + "_Hair"
     hair_obj.scale = (0.35*scale, 0.31*scale, 0.19*scale)
     hair_obj.data.materials.append(hair)
+    mouth_mat = material(name + "_Mouth", (0.12, 0.018, 0.025), roughness=0.8)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=20, ring_count=12, location=(x, -0.305*scale, 1.94*scale))
+    mouth = bpy.context.object
+    mouth.name = name + "_Mouth"
+    mouth.scale = (0.075*scale, 0.025*scale, 0.018*scale)
+    mouth.data.materials.append(mouth_mat)
+    mouth["speaker"] = name
     eye_mat = material(name + "_EyeWhite", (0.95, 0.95, 0.9))
     for side in (-1, 1):
         bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=12, location=(x+side*0.12*scale, -0.294*scale, 2.08*scale))
@@ -77,6 +84,23 @@ def build_scene(output):
     add_character("Adam", -2.2, blue, skin, hair, 1.05)
     add_character("Sami", 0.0, black, skin, hair, 0.95)
     add_character("Leila", 2.2, purple, skin, hair, 1.0)
+    # Dialogue windows are aligned with the generated Arabic voice tracks.
+    speech_windows = {"Adam": (1.0, 4.0), "Sami": (4.2, 7.1), "Leila": (7.3, 11.5)}
+    for obj in bpy.data.objects:
+        if obj.name.endswith("_Mouth"):
+            speaker = obj.get("speaker")
+            start, end = speech_windows[speaker]
+            closed = (0.075, 0.025, 0.018)
+            opened = (0.075, 0.025, 0.075)
+            for frame, scale in [(1, closed), (int(start*24), closed)]:
+                obj.scale = scale
+                obj.keyframe_insert(data_path="scale", frame=frame)
+            for t in [start + i*0.24 for i in range(int((end-start)/0.24)+1)]:
+                frame = max(1, int(t*24))
+                obj.scale = opened if int((t-start)/0.24) % 2 == 0 else closed
+                obj.keyframe_insert(data_path="scale", frame=frame)
+            obj.scale = closed
+            obj.keyframe_insert(data_path="scale", frame=int(end*24))
     for loc, color, power, size in [
         ((-4, -3, 6), (0.12, 0.35, 1), 1300, 5),
         ((4, 1, 5), (1, 0.55, 0.18), 1100, 4),
@@ -97,15 +121,15 @@ def build_scene(output):
     cam.location = (0, -12, 3.8)
     cam.keyframe_insert(data_path="location", frame=1)
     cam.location = (0, -10, 3.5)
-    cam.keyframe_insert(data_path="location", frame=192)
+    cam.keyframe_insert(data_path="location", frame=288)
     coin.rotation_euler[1] = 0
     coin.keyframe_insert(data_path="rotation_euler", frame=1)
     coin.rotation_euler[1] = math.tau
-    coin.keyframe_insert(data_path="rotation_euler", frame=192)
+    coin.keyframe_insert(data_path="rotation_euler", frame=288)
 
     scene = bpy.context.scene
     scene.frame_start = 1
-    scene.frame_end = 192
+    scene.frame_end = 288
     scene.render.fps = 24
     scene.render.resolution_x = 720
     scene.render.resolution_y = 1280
