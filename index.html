@@ -143,6 +143,7 @@
                     <i class="fa-solid fa-volume-high" id="sound-icon"></i>
                 </button>
 
+                <button onclick="openCaseArchive()" class="px-3 py-2.5 rounded-lg bg-amber-700/20 hover:bg-amber-700/40 text-amber-300 font-bold text-sm border border-amber-600/50 flex items-center gap-2 transition"><i class="fa-solid fa-folder-tree"></i><span>أرشيف القضايا</span></button>
                 <button onclick="openAccusationModal()" class="px-4 py-2.5 rounded-lg bg-gradient-to-l from-red-700 to-red-800 hover:from-red-600 hover:to-red-700 text-white font-bold text-sm shadow-lg shadow-red-950/50 border border-red-500/40 flex items-center gap-2 transition transform active:scale-95">
                     <i class="fa-solid fa-gavel"></i>
                     <span>تقديم الاتهام النهائي</span>
@@ -507,6 +508,17 @@
         </section>
 
     </main>
+
+
+    <div id="case-archive" class="fixed inset-0 z-[70] hidden bg-black/90 backdrop-blur-md overflow-y-auto p-3 sm:p-6">
+      <div class="max-w-5xl mx-auto my-4 bg-[#141820] border border-amber-700/40 rounded-2xl shadow-2xl overflow-hidden">
+        <div class="p-5 border-b border-stone-800 flex items-center justify-between gap-3">
+          <div><div class="text-xs text-amber-400 font-bold">وحدة القضايا غير المحلولة</div><h2 class="text-2xl font-black text-white">أرشيف المحقق</h2><p class="text-xs text-stone-400 mt-1">اختر ملفاً جديداً. تقدمك محفوظ على هذا الجهاز.</p></div>
+          <button onclick="closeCaseArchive()" class="p-2 text-stone-400 hover:text-white" aria-label="إغلاق"><i class="fa-solid fa-xmark text-2xl"></i></button>
+        </div>
+        <div id="case-archive-content" class="p-5"></div>
+      </div>
+    </div>
 
     <!-- نافذة عرض تفاصيل الدليل (Modal) -->
     <div id="clue-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
@@ -1320,6 +1332,70 @@
             renderSuspects();
             initCorkboard();
         };
-    </script>
+    
+        // ================= أرشيف القضايا الإضافية =================
+        const mohakCases = [
+          {id:'night_train',file:'MOH-217',title:'لغز العربة السابعة',level:'متوسط',place:'قطار الشرق الليلي',summary:'اختفى خبير ألماس من عربة مغلقة أثناء توقف القطار لسبع دقائق. ثلاثة ركاب يروون روايات لا تتفق مع سجل المحطات.',victim:'الدكتور سامر نجيب',clues:[
+            ['ticket','تذكرة ممزقة','نصف تذكرة من الدرجة الأولى تحمل توقيتاً مختلفاً عن ختم الصعود.'],
+            ['mud','طين أحمر على الحذاء','الطين لا يوجد قرب الرصيف، لكنه مطابق لطين مستودع الصيانة.'],
+            ['clock','ساعة متوقفة','ساعة الضحية توقفت عند 23:17، بينما سجل القطار يثبت توقفه عند 23:24.'],
+            ['key','نسخة مفتاح الخدمة','سجل المفاتيح يظهر أن نسخة احتياطية أعيدت قبل الرحلة بيوم دون توقيع.'],
+            ['note','رسالة مشفرة','الرسالة تقول: «الحجر ليس في الحقيبة».'],
+            ['fiber','ألياف زرقاء','ألياف من زي موظفي الصيانة عُلقت بمقبض نافذة العربة.']
+          ],suspects:[
+            ['noura','نورا حداد','مراسلة صحفية','تقول إنها لم تغادر مقصورتها طوال التوقف.','كانت تبحث عن قصة تهريب ألماس.'],
+            ['mazen','مازن عيسى','مفتش القطار','يقول إن مفاتيح الخدمة بقيت في الخزانة.','يعرف ممرات الصيانة ومواعيد التوقف.'],
+            ['fadi','فادي مراد','تاجر مجوهرات','يدعي أنه لم يعرف الضحية قبل الرحلة.','كان عليه دين كبير للضحية.']
+          ],solution:{killer:'mazen',motive:'smuggling',method:'service',proof:'key'}},
+          {id:'library',file:'MOH-318',title:'سر المخطوطة الرمادية',level:'صعب',place:'مكتبة دار السرو',summary:'اختفت مخطوطة وحيدة من غرفة محفوظات لا يدخلها إلا أربعة أشخاص. نظام الإنذار لم يسجل أي اقتحام، لكن سجل الرطوبة يحمل قفزة غريبة.',victim:'المخطوطة «الرمادية»',clues:[
+            ['humidity','قفزة الرطوبة','ارتفعت الرطوبة في الخزانة لثلاث دقائق فقط رغم أن الغرفة لم تُفتح.'],
+            ['wax','شمع أزرق','قطعة شمع أزرق على حافة الرف، من النوع المستخدم في ترميم أغلفة الكتب.'],
+            ['ledger','سجل الإعارة','تم تعديل رقم صفحة في سجل الإعارة بالحبر نفسه المستخدم في مكتب المدير.'],
+            ['dust','غبار متصل','الغبار خلف الرف متصل بلا أثر سحب؛ اللوح الخلفي يتحرك من الداخل.'],
+            ['glove','قفاز نظيف','قفاز واحد بلا بصمات، لكن داخله أثر مسحوق ترميم نادر.'],
+            ['draft','تيار هواء','ورقة رقيقة قرب الرف تحركت رغم إغلاق النوافذ والتهوية.']
+          ],suspects:[
+            ['salma','سلمى رافع','مرممة مخطوطات','تقول إنها لم تلمس الرف منذ أسبوع.','كانت الوحيدة التي تملك مسحوق الترميم النادر.'],
+            ['hisham','هشام بركات','مدير المكتبة','يؤكد أن سجل الإعارة لم يتغير.','له صلاحية تعديل السجلات والإنذار.'],
+            ['younes','يونس عادل','باحث زائر','يقول إنه غادر قبل إغلاق المكتبة.','نشر سابقاً بحثاً عن ممرات المبنى القديمة.']
+          ],solution:{killer:'salma',motive:'resale',method:'passage',proof:'glove'}}
+        ];
+        let activeMohakCase=null;
+        let mohakFound=new Set();
+        let mohakQuestions=new Set();
+        function caseProgress(id){try{return JSON.parse(localStorage.getItem('mohak_case_'+id)||'{}')}catch(e){return {}}}
+        function saveMohakProgress(){if(!activeMohakCase)return;localStorage.setItem('mohak_case_'+activeMohakCase.id,JSON.stringify({found:[...mohakFound],questions:[...mohakQuestions],notes:document.getElementById('mohak-notes')?.value||''}));}
+        function openCaseArchive(){document.getElementById('case-archive').classList.remove('hidden');renderCaseArchive();}
+        function closeCaseArchive(){document.getElementById('case-archive').classList.add('hidden');}
+        function renderCaseArchive(){
+          const host=document.getElementById('case-archive-content');
+          host.innerHTML='<div class="grid md:grid-cols-2 gap-4">'+
+            '<button onclick="switchTab(\'briefing\');closeCaseArchive()" class="text-right p-5 rounded-xl border border-amber-600/40 bg-amber-950/20 hover:bg-amber-950/40"><div class="text-xs text-amber-400">MOH-409-B • القضية الحالية</div><h3 class="text-lg font-black text-white mt-2">قصر الأوركيد</h3><p class="text-sm text-stone-400 mt-2">مقتل جامع التحف في غرفة مغلقة. تابع التحقيق الحالي.</p><span class="inline-block mt-4 text-xs text-emerald-400">فتح الملف الحالي ←</span></button>'+
+            mohakCases.map(c=>{const p=caseProgress(c.id);const done=p.completed?' • محلولة':'';return '<button onclick="startMohakCase(\''+c.id+'\')" class="text-right p-5 rounded-xl border border-stone-700 bg-stone-900/70 hover:border-amber-600/70"><div class="flex justify-between text-xs"><span class="text-amber-400">'+c.file+'</span><span class="text-stone-400">'+c.level+'</span></div><h3 class="text-lg font-black text-white mt-2">'+c.title+'</h3><p class="text-sm text-stone-400 mt-2">'+c.summary+'</p><span class="inline-block mt-4 text-xs text-emerald-400">'+(p.completed?'تم حلها':(p.found?.length||0)+' / '+c.clues.length+' أدلة مكتشفة')+done+' ←</span></button>'}).join('')+'</div>';
+        }
+        function startMohakCase(id){
+          activeMohakCase=mohakCases.find(c=>c.id===id);const p=caseProgress(id);mohakFound=new Set(p.found||[]);mohakQuestions=new Set(p.questions||[]);
+          renderMohakCase();window.scrollTo({top:0,behavior:'smooth'});
+        }
+        function renderMohakCase(){
+          const c=activeMohakCase;if(!c)return;const host=document.getElementById('case-archive-content');
+          const clues=c.clues.map(x=>'<button onclick="inspectMohakClue(\''+x[0]+'\')" class="text-right p-3 rounded-lg border '+(mohakFound.has(x[0])?'border-emerald-700 bg-emerald-950/20':'border-stone-700 bg-stone-900 hover:border-amber-600')+'"><div class="text-xs '+(mohakFound.has(x[0])?'text-emerald-400':'text-amber-400')+'">'+(mohakFound.has(x[0])?'تم الفحص':'دليل ميداني')+'</div><div class="font-bold text-white mt-1">'+x[1]+'</div><div class="text-xs text-stone-500 mt-1">'+(mohakFound.has(x[0])?x[2]:'اضغط لفحص الدليل وكشف تفاصيله')+'</div></button>').join('');
+          const people=c.suspects.map(x=>'<div class="p-3 rounded-lg bg-stone-900 border border-stone-700"><div class="font-bold text-white">'+x[1]+' <span class="text-xs text-amber-400">• '+x[2]+'</span></div><p class="text-xs text-stone-400 mt-2">'+x[3]+'</p><button onclick="questionMohakSuspect(\''+x[0]+'\')" class="mt-2 text-xs text-amber-400 underline">'+(mohakQuestions.has(x[0])?'إظهار الملاحظة':'مراجعة ملف المشتبه به')+'</button><p id="mohak-person-'+x[0]+'" class="text-xs text-stone-300 mt-2 '+(mohakQuestions.has(x[0])?'':'hidden')+'">'+x[4]+'</p></div>').join('');
+          host.innerHTML='<div class="flex flex-wrap justify-between gap-3 mb-4"><div><div class="text-xs text-amber-400">'+c.file+' • '+c.level+'</div><h3 class="text-2xl font-black text-white">'+c.title+'</h3><p class="text-xs text-stone-400 mt-1">'+c.place+' • '+c.victim+'</p></div><button onclick="renderCaseArchive()" class="h-fit text-sm text-amber-400">← العودة للأرشيف</button></div><p class="text-sm text-stone-300 leading-7 bg-stone-900/70 p-4 rounded-xl border border-stone-800">'+c.summary+'</p><div class="flex justify-between text-xs text-stone-400 mt-5 mb-2"><span>الأدلة التي فحصتها</span><b class="text-amber-400">'+mohakFound.size+' / '+c.clues.length+'</b></div><div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">'+clues+'</div><h4 class="font-bold text-amber-400 mt-6 mb-3">ملفات المشتبه بهم واستجوابهم</h4><div class="grid md:grid-cols-3 gap-3">'+people+'</div><div class="mt-5"><label class="block text-sm text-amber-400 mb-2">ملاحظات المحقق</label><textarea id="mohak-notes" oninput="saveMohakProgress()" class="w-full bg-stone-950 border border-stone-700 rounded-lg p-3 text-sm text-white" rows="3" placeholder="سجل فرضياتك والتناقضات...">'+(persistenceNotes(c.id))+'</textarea></div><div class="mt-5 p-4 rounded-xl border border-red-800/50 bg-red-950/10"><h4 class="font-bold text-white mb-3">قرار المحقق النهائي</h4><div class="grid sm:grid-cols-2 gap-3"><select id="mh-killer" class="bg-stone-900 border border-stone-700 rounded p-3 text-sm text-white"><option value="">حدد المشتبه به</option>'+c.suspects.map(x=>'<option value="'+x[0]+'">'+x[1]+'</option>').join('')+'</select><select id="mh-motive" class="bg-stone-900 border border-stone-700 rounded p-3 text-sm text-white"><option value="">حدد الدافع</option><option value="smuggling">تهريب وإخفاء مسار السرقة</option><option value="resale">بيع القطعة المسروقة لسداد الديون</option><option value="inheritance">الميراث</option></select><select id="mh-method" class="bg-stone-900 border border-stone-700 rounded p-3 text-sm text-white"><option value="">حدد طريقة التنفيذ</option><option value="service">استعمال مفتاح وممر الخدمة أثناء توقف القطار</option><option value="passage">استعمال ممر مخفي خلف الرف</option><option value="force">اقتحام مباشر بالقوة</option></select><select id="mh-proof" class="bg-stone-900 border border-stone-700 rounded p-3 text-sm text-white"><option value="">حدد الدليل الحاسم</option>'+c.clues.map(x=>'<option value="'+x[0]+'">'+x[1]+'</option>').join('')+'</select></div><button onclick="submitMohakVerdict()" class="mt-4 w-full rounded-lg bg-red-700 hover:bg-red-600 text-white font-bold p-3">إرسال تقرير الاتهام</button><div id="mh-result" class="mt-3 text-sm" role="status"></div></div>';
+          ['killer','motive','method','proof'].forEach(k=>{const el=document.getElementById('mh-'+k);if(el)el.value=p['answer_'+k]||'';});
+        }
+        function persistenceNotes(id){return caseProgress(id).notes||''}
+        function inspectMohakClue(id){const clue=activeMohakCase.clues.find(x=>x[0]===id);if(!clue)return;mohakFound.add(id);saveMohakProgress();renderMohakCase();const msg=document.getElementById('mh-result');if(msg)msg.textContent='تم تسجيل الدليل في ملف القضية: '+clue[1];}
+        function questionMohakSuspect(id){mohakQuestions.add(id);saveMohakProgress();const el=document.getElementById('mohak-person-'+id);if(el)el.classList.remove('hidden');}
+        function submitMohakVerdict(){
+          const c=activeMohakCase;if(!c)return;const answer={};['killer','motive','method','proof'].forEach(k=>answer[k]=document.getElementById('mh-'+k).value);
+          if(Object.values(answer).some(v=>!v)){document.getElementById('mh-result').textContent='أكمل عناصر الاتهام الأربعة قبل الإرسال.';return;}
+          const s=c.solution;let score=(answer.killer===s.killer?1:0)+(answer.motive===s.motive?1:0)+(answer.method===s.method?1:0)+(answer.proof===s.proof?1:0);
+          const coverage=mohakFound.size;let ending=score===4&&coverage>=4?'إغلاق مثالي: الأدلة مترابطة والاتهام مدعوم بما يكفي.':score===4?'الحقيقة صحيحة، لكن ملفك ضعيف الإثبات. اجمع أربعة أدلة على الأقل لتقرير متين.':score>=2?'نهاية جزئية: اقتربت من الحقيقة لكن بقيت ثغرات سمحت بالطعن في الاتهام.':'اتهام خاطئ: أعيد فتح الملف وراجع التسلسل والأدلة قبل توجيه اتهام جديد.';
+          const p=caseProgress(c.id);Object.assign(p,{found:[...mohakFound],questions:[...mohakQuestions],notes:document.getElementById('mohak-notes')?.value||'',answer_killer:answer.killer,answer_motive:answer.motive,answer_method:answer.method,answer_proof:answer.proof,completed:score===4&&coverage>=4});localStorage.setItem('mohak_case_'+c.id,JSON.stringify(p));
+          document.getElementById('mh-result').innerHTML='<div class="rounded-lg p-4 '+(score===4&&coverage>=4?'bg-emerald-950/40 border border-emerald-600':'bg-amber-950/30 border border-amber-700')+'"><b class="text-white">'+(score===4&&coverage>=4?'محقق متميز • 100%':'نتيجة التحقيق: '+score+'/4')+'</b><p class="mt-2 text-stone-300">'+ending+'</p><p class="mt-2 text-xs text-stone-400">الأدلة المفحوصة: '+coverage+' من '+c.clues.length+'. يمكنك تعديل الاتهام وإعادة المحاولة.</p></div>';
+        }
+
+</script>
 </body>
 </html>
