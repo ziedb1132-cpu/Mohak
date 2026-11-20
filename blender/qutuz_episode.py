@@ -104,7 +104,7 @@ def horse(name, x, y, coat):
 def scene_group(index, title, subtitle, style):
     start = (index-1)*SCENE_SECONDS*FPS + 1
     end = index*SCENE_SECONDS*FPS
-    before = set(bpy.data.objects)
+    before = {obj.name for obj in bpy.data.objects}
     # Stage-specific scenery
     if style == "map":
         cube("Map_Parchment",(0,1,.1),(17,10,.12),sand)
@@ -189,8 +189,8 @@ def scene_group(index, title, subtitle, style):
 
     text_obj(title,(0,-7.0,6.1),.72,gold,"Scene_Title")
     text_obj(subtitle,(0,-7.0,5.45),.36,ivory,"Scene_Subtitle")
-    after = set(bpy.data.objects)
-    created = list(after-before)
+    after = {obj.name for obj in bpy.data.objects}
+    created = [bpy.data.objects[name] for name in (after-before)]
     for obj in created:
         obj.hide_render = True
         obj.keyframe_insert(data_path="hide_render", frame=1)
@@ -206,6 +206,7 @@ def scene_group(index, title, subtitle, style):
                     kp.interpolation = "CONSTANT"
 
 def build(output):
+    global skin, robe, metal, gold, sand, ochre, stone, ivory, red, charcoal, wood, leather, fire, dark
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
     global ACTIVE_OBJECTS
