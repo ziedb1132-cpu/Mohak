@@ -17,21 +17,37 @@ permissions:
 jobs:
   render:
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Blender and Python
+      - name: Install Blender 4.5.16 LTS
+        shell: bash
         run: |
+          set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y blender python3
-          blender --version
+          sudo apt-get install -y curl xz-utils libxi6 libxrender1 libxfixes3 libxkbcommon0 libsm6 libgl1
+          BLENDER_ARCHIVE="$RUNNER_TEMP/blender-4.5.16-linux-x64.tar.xz"
+          BLENDER_DIR="$RUNNER_TEMP/blender"
+          curl -fL --retry 3 --retry-delay 2 \
+            "https://download.blender.org/release/Blender4.5/blender-4.5.16-linux-x64.tar.xz" \
+            -o "$BLENDER_ARCHIVE"
+          mkdir -p "$BLENDER_DIR"
+          tar -xJf "$BLENDER_ARCHIVE" --strip-components=1 -C "$BLENDER_DIR"
+          "$BLENDER_DIR/blender" --background --factory-startup --version
+          echo "BLENDER_BIN=$BLENDER_DIR/blender" >> "$GITHUB_ENV"
 
       - name: Render episode
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p output
-          blender -b -P blender/animation_project.py -- --output output/${{ inputs.episode }}.mp4
+          "$BLENDER_BIN" --background --factory-startup \
+            -P blender/animation_project.py -- \
+            --output "output/${{ inputs.episode }}.mp4"
+          test -s "output/${{ inputs.episode }}.mp4"
+          ls -lh output/
 
       - name: Upload MP4 artifact
         uses: actions/upload-artifact@v4
