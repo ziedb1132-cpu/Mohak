@@ -1,0 +1,62 @@
+name: Produce Qutuz Historical Episode
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render-qutuz:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install production dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y curl xz-utils ffmpeg espeak-ng libxi6 libxrender1 libxfixes3 libxkbcommon0 libsm6 libgl1 libegl1 libegl-mesa0
+
+      - name: Install Blender 4.5.16
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARCHIVE="$RUNNER_TEMP/blender-4.5.16-linux-x64.tar.xz"
+          DEST="$RUNNER_TEMP/blender"
+          curl -fL --retry 3 --retry-delay 2 "https://download.blender.org/release/Blender4.5/blender-4.5.16-linux-x64.tar.xz" -o "$ARCHIVE"
+          mkdir -p "$DEST"
+          tar -xJf "$ARCHIVE" --strip-components=1 -C "$DEST"
+          "$DEST/blender" --background --factory-startup --version
+          echo "BLENDER_BIN=$DEST/blender" >> "$GITHUB_ENV"
+
+      - name: Generate 3-minute Arabic narration
+        run: python3 python/qutuz_audio.py
+
+      - name: Render 12-scene 3D animatic
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          "$BLENDER_BIN" --background --factory-startup -P blender/qutuz_episode.py -- --output output/episode_001_silent.mp4
+
+      - name: Combine animation and Arabic narration
+        shell: bash
+        run: |
+          set -euo pipefail
+          ffmpeg -y -i output/episode_001_silent.mp4 -i output/episode_001_audio.wav \
+            -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k \
+            -t 180 -movflags +faststart output/qutuz_episode_001.mp4
+          test -s output/qutuz_episode_001.mp4
+          ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 output/qutuz_episode_001.mp4
+
+      - name: Upload finished episode
+        uses: actions/upload-artifact@v4
+        with:
+          name: qutuz-historical-episode-001
+          path: output/qutuz_episode_001.mp4
+          if-no-files-found: error
+          retention-days: 14
