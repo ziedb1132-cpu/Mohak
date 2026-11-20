@@ -27,7 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y curl xz-utils libxi6 libxrender1 libxfixes3 libxkbcommon0 libsm6 libgl1
+          sudo apt-get install -y curl xz-utils libxi6 libxrender1 libxfixes3 libxkbcommon0 libsm6 libgl1 libegl1 libegl-mesa0
           BLENDER_ARCHIVE="$RUNNER_TEMP/blender-4.5.16-linux-x64.tar.xz"
           BLENDER_DIR="$RUNNER_TEMP/blender"
           curl -fL --retry 3 --retry-delay 2 \
