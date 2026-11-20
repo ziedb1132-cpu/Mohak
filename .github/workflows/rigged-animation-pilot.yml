@@ -1,0 +1,81 @@
+name: Mohak - Rigged 3D Animation Pilot
+
+on:
+  workflow_dispatch:
+    inputs:
+      resolution:
+        description: Render resolution
+        required: true
+        type: choice
+        default: "720"
+        options: ["540", "720"]
+      samples:
+        description: Eevee quality preset (reserved for future tuning)
+        required: true
+        type: choice
+        default: "24"
+        options: ["16", "24", "32"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mohak-rigged-pilot
+  cancel-in-progress: false
+
+jobs:
+  render-pilot:
+    name: Build and render 15-second rigged 3D pilot
+    runs-on: ubuntu-22.04
+    timeout-minutes: 350
+    steps:
+      - name: Checkout Mohak
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl xz-utils ffmpeg libxi6 libxrender1 libxfixes3 libxkbcommon0 libsm6 libgl1 libegl1 libegl-mesa0
+
+      - name: Cache Blender archive
+        id: blender-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/blender-4.5.16-linux-x64.tar.xz
+          key: blender-4.5.16-linux-x64
+
+      - name: Download Blender
+        if: steps.blender-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fL --retry 3 --retry-delay 2 "https://download.blender.org/release/Blender4.5/blender-4.5.16-linux-x64.tar.xz" -o "$RUNNER_TEMP/blender-4.5.16-linux-x64.tar.xz"
+
+      - name: Install Blender
+        run: |
+          mkdir -p "$RUNNER_TEMP/blender"
+          tar -xJf "$RUNNER_TEMP/blender-4.5.16-linux-x64.tar.xz" --strip-components=1 -C "$RUNNER_TEMP/blender"
+          "$RUNNER_TEMP/blender/blender" --background --factory-startup --version
+          echo "BLENDER_BIN=$RUNNER_TEMP/blender/blender" >> "$GITHUB_ENV"
+
+      - name: Render actual rigged character animation
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          "$BLENDER_BIN" --background --factory-startup -P blender/rigged_animation_pilot.py -- --output output/mohak_rigged_pilot_001.mp4 --resolution "${{ inputs.resolution }}" --samples "${{ inputs.samples }}"
+          test -s output/mohak_rigged_pilot_001.mp4
+          ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 output/mohak_rigged_pilot_001.mp4
+
+      - name: Upload pilot video
+        uses: actions/upload-artifact@v4
+        with:
+          name: mohak-rigged-3d-pilot
+          path: output/mohak_rigged_pilot_001.mp4
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Write render summary
+        if: always()
+        run: |
+          echo "## Mohak rigged 3D pilot" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Render target: 15 seconds, 720p, 24 fps (360 frames)." >> "$GITHUB_STEP_SUMMARY"
+          echo "- Characters: skeletal armatures with bone-attached body meshes and keyed poses." >> "$GITHUB_STEP_SUMMARY"
+          echo "- Output artifact: mohak-rigged-3d-pilot." >> "$GITHUB_STEP_SUMMARY"
