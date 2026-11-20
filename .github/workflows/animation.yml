@@ -65,6 +65,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: crypto-animation-episode
-          path: output/*.mp4
+          path: output/${{ inputs.episode }}.mp4
           if-no-files-found: error
           retention-days: 14
