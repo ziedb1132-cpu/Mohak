@@ -3,6 +3,7 @@
 import argparse
 import math
 import sys
+import time
 from pathlib import Path
 
 import bpy
@@ -20,6 +21,9 @@ def cli():
     p = argparse.ArgumentParser()
     p.add_argument("--output", default="output/episode_001_silent.mp4")
     p.add_argument("--scene-index", type=int, default=0)
+    p.add_argument("--resolution-scale", type=int, default=75)
+    p.add_argument("--benchmark-frames", type=int, default=0)
+    p.add_argument("--eevee-samples", type=int, default=16)
     return p.parse_args(argv)
 
 def mat(name, color, metallic=0.0, rough=0.65, emission=0.0):
@@ -206,7 +210,7 @@ def scene_group(index, title, subtitle, style):
                 for kp in fc.keyframe_points:
                     kp.interpolation = "CONSTANT"
 
-def build(output, scene_index=0):
+def build(output, scene_index=0, resolution_scale=75, benchmark_frames=0, eevee_samples=16):
     global skin, robe, metal, gold, sand, ochre, stone, ivory, red, charcoal, wood, leather, fire, dark
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
@@ -271,8 +275,12 @@ def build(output, scene_index=0):
         scene.frame_start=1
         scene.frame_end=END_FRAME
     scene.render.fps=FPS
-    scene.render.resolution_x=1280; scene.render.resolution_y=720; scene.render.resolution_percentage=100
+    scene.render.resolution_x=1280; scene.render.resolution_y=720; scene.render.resolution_percentage=max(25,min(100,resolution_scale))
     scene.render.engine="BLENDER_EEVEE_NEXT" if bpy.app.version >= (4,2,0) else "BLENDER_EEVEE"
+    if hasattr(scene, "eevee") and hasattr(scene.eevee, "taa_render_samples"):
+        scene.eevee.taa_render_samples=max(1,eevee_samples)
+    if hasattr(scene, "eevee") and hasattr(scene.eevee, "use_raytracing"):
+        scene.eevee.use_raytracing=False
     scene.world.color=(.025,.018,.012)
     scene.view_settings.view_transform="Standard"
     scene.render.image_settings.file_format="FFMPEG"
@@ -281,12 +289,21 @@ def build(output, scene_index=0):
     scene.render.film_transparent=False
     out=Path(output).resolve(); out.parent.mkdir(parents=True,exist_ok=True)
     scene.render.filepath=str(out)
+    if benchmark_frames > 0:
+        if scene_index == 0:
+            raise ValueError("benchmark mode requires --scene-index")
+        scene.frame_end=min(scene.frame_end,scene.frame_start+benchmark_frames-1)
+    expected_frames=scene.frame_end-scene.frame_start+1
+    started=time.perf_counter()
     bpy.ops.render.render(animation=True)
+    elapsed=time.perf_counter()-started
     if not out.exists() or out.stat().st_size==0:
         raise RuntimeError("Render produced no MP4: "+str(out))
     rendered_frames = scene.frame_end - scene.frame_start + 1
+    fps_rendered=rendered_frames/elapsed if elapsed > 0 else 0
+    print("QUTUZ_RENDER_METRICS",{"scene":scene_index or "all","frames":rendered_frames,"seconds":round(elapsed,2),"frames_per_second":round(fps_rendered,3),"estimated_360_frame_minutes":round(360/max(fps_rendered,0.001)/60,2),"resolution_percentage":scene.render.resolution_percentage,"eevee_samples":eevee_samples,"benchmark":benchmark_frames>0})
     print("QUTUZ_ANIMATIC_RENDER_COMPLETE",out,out.stat().st_size,"frames",rendered_frames,"scene",scene_index or "all")
 
 if __name__=="__main__":
     args = cli()
-    build(args.output, args.scene_index)
+    build(args.output, args.scene_index, args.resolution_scale, args.benchmark_frames, args.eevee_samples)
