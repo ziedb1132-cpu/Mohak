@@ -1,0 +1,42 @@
+name: Render Animation Episode
+
+on:
+  workflow_dispatch:
+    inputs:
+      episode:
+        description: "Episode to render"
+        required: true
+        default: "episode_001"
+        type: choice
+        options:
+          - episode_001
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Blender and Python
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender python3
+          blender --version
+
+      - name: Render episode
+        run: |
+          mkdir -p output
+          blender -b -P blender/animation_project.py -- --output output/${{ inputs.episode }}.mp4
+
+      - name: Upload MP4 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: crypto-animation-episode
+          path: output/*.mp4
+          if-no-files-found: error
+          retention-days: 14
