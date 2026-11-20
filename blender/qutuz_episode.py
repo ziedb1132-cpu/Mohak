@@ -19,6 +19,7 @@ def cli():
     argv = argv[argv.index("--") + 1:] if "--" in argv else []
     p = argparse.ArgumentParser()
     p.add_argument("--output", default="output/episode_001_silent.mp4")
+    p.add_argument("--scene-index", type=int, default=0)
     return p.parse_args(argv)
 
 def mat(name, color, metallic=0.0, rough=0.65, emission=0.0):
@@ -205,7 +206,7 @@ def scene_group(index, title, subtitle, style):
                 for kp in fc.keyframe_points:
                     kp.interpolation = "CONSTANT"
 
-def build(output):
+def build(output, scene_index=0):
     global skin, robe, metal, gold, sand, ochre, stone, ivory, red, charcoal, wood, leather, fire, dark
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
@@ -250,7 +251,11 @@ def build(output):
       ("نتيجة المعركة","انتصار المماليك","victory"),
       ("نهاية السلطان وبقاء الأثر","قطز · عين جالوت · 658هـ","legacy"),
     ]
-    for i,(title,sub,style) in enumerate(scenes,1):
+    if scene_index < 0 or scene_index > len(scenes):
+        raise ValueError("scene-index must be 0..12")
+    selected = range(1, len(scenes)+1) if scene_index == 0 else (scene_index,)
+    for i in selected:
+        title,sub,style = scenes[i-1]
         scene_group(i,title,sub,style)
         frame=(i-1)*SCENE_SECONDS*FPS+1
         cam.location=(0,-20-(i%3)*1.2,8+(i%2)*.5)
@@ -259,7 +264,13 @@ def build(output):
         for kp in fc.keyframe_points:
             kp.interpolation="BEZIER"
     scene=bpy.context.scene
-    scene.frame_start=1; scene.frame_end=END_FRAME; scene.render.fps=FPS
+    if scene_index:
+        scene.frame_start=(scene_index-1)*SCENE_SECONDS*FPS+1
+        scene.frame_end=scene_index*SCENE_SECONDS*FPS
+    else:
+        scene.frame_start=1
+        scene.frame_end=END_FRAME
+    scene.render.fps=FPS
     scene.render.resolution_x=1280; scene.render.resolution_y=720; scene.render.resolution_percentage=100
     scene.render.engine="BLENDER_EEVEE_NEXT" if bpy.app.version >= (4,2,0) else "BLENDER_EEVEE"
     scene.world.color=(.025,.018,.012)
@@ -273,7 +284,9 @@ def build(output):
     bpy.ops.render.render(animation=True)
     if not out.exists() or out.stat().st_size==0:
         raise RuntimeError("Render produced no MP4: "+str(out))
-    print("QUTUZ_ANIMATIC_RENDER_COMPLETE",out,out.stat().st_size,"frames",END_FRAME)
+    rendered_frames = scene.frame_end - scene.frame_start + 1
+    print("QUTUZ_ANIMATIC_RENDER_COMPLETE",out,out.stat().st_size,"frames",rendered_frames,"scene",scene_index or "all")
 
 if __name__=="__main__":
-    build(cli().output)
+    args = cli()
+    build(args.output, args.scene_index)
